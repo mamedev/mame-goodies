@@ -13,12 +13,14 @@ local plugindir
 
 
 local function load_settings()
+	local json = require('json')
+
 	local function calculate_offset_from_milliseconds(milliseconds)
 		return math.floor((emu.attotime.from_msec(milliseconds):as_double() * 44100) + 0.5)
 	end
 
 	local function get_processed_offset_value(val)
-		local match = string.match(val, "([%d]+[%.]?[%d]*)%s*[mM][sS]")
+		local match = string.match(val, "([-]?[%d]+[%.]?[%d]*)%s*[mM][sS]")
 		if match ~= nil then
 			return calculate_offset_from_milliseconds(tonumber(match))
 		end
@@ -26,32 +28,56 @@ local function load_settings()
 		return math.floor(val + 0.5)
 	end
 
-	local json = require('json')
-	local filename = plugindir .. '/settings.json'
-	local file = io.open(filename, 'r')
-	local default_offset = calculate_offset_from_milliseconds(28)
-
-	local loaded_settings
-	if file then
-		loaded_settings = json.parse(file:read('a'))
+	local function load_json(dirname)
+		local filename = dirname .. '/settings.json'
+		local file = io.open(filename, 'r')
+		if not file then
+			return nil
+		end
+		local parsed, pos, msg = json.parse(file:read('a'))
 		file:close()
+		if not parsed then
+			emu.print_error(string.format('Error loading System 573 audio offset settings: error parsing %s as JSON: %s', filename, msg))
+			return nil
+		elseif type(parsed) ~= 'table' then
+			emu.print_error(string.format('Error loading System 573 audio offset settings: %s has incorrect JSON type %s (must be table)', filename, type(parsed)))
+			return nil
+		end
+		return parsed
 	end
+
+	local loaded_settings = load_json(plugindir)
 	if not loaded_settings then
 		emu.print_error(string.format('Error loading System 573 audio offset settings: error opening or parsing %s as JSON', filename))
 		loaded_settings = {}
 	end
 
-	if loaded_settings['default'] == nil then
-		loaded_settings['default'] = default_offset
+	if not loaded_settings['default'] then
+		loaded_settings['default'] = 0
+	else
+		loaded_settings['default'] = get_processed_offset_value(loaded_settings['default'])
 	end
-	loaded_settings['default'] = get_processed_offset_value(loaded_settings['default'])
 
-	if loaded_settings['overrides'] == nil then
+	if not loaded_settings['overrides'] then
 		loaded_settings['overrides'] = {}
 	end
 
-	for k, v in pairs(loaded_settings["overrides"]) do
+	for k, v in pairs(loaded_settings['overrides']) do
 		loaded_settings['overrides'][k] = get_processed_offset_value(v)
+	end
+
+	local datadir = manager.machine.options.entries.homepath:value():match('([^;]+)') .. '/' .. exports.name
+	local local_settings = load_json(datadir)
+	if local_settings then
+		if local_settings['default'] then
+			loaded_settings['default'] = get_processed_offset_value(local_settings['default'])
+		end
+
+		if local_settings['overrides'] then
+			for k, v in pairs(local_settings['overrides']) do
+				loaded_settings['overrides'][k] = get_processed_offset_value(v)
+			end
+		end
 	end
 
 	return loaded_settings

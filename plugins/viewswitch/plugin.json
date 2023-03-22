@@ -1,0 +1,10 @@
+{
+	"plugin": {
+		"name": "viewswitch",
+		"description": "Quick view switch plugin",
+		"version": "0.0.1",
+		"author": "Vas Crabb",
+		"type": "plugin",
+		"start": "false"
+	  }
+}
