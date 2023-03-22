@@ -1,0 +1,10 @@
+{
+	"plugin": {
+		"name": "ksys573_da_offset",
+		"description": "Konami System 573 digital audio offset plugin",
+		"version": "0.0.1",
+		"author": "windyfairy",
+		"type": "plugin",
+		"start": "true"
+	}
+}

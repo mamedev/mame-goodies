@@ -1,0 +1,5 @@
+* text=auto !eol
+
+*.json              svneol=native#application/json
+*.lua               svneol=native#text/plain
+*.md                svneol=native#text/plain

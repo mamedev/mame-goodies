@@ -1,0 +1,26 @@
+name: Validate plugins
+
+on:
+  push:
+    paths:
+    - '.github/workflows/**'
+    - 'plugins/**'
+  pull_request:
+    paths:
+    - '.github/workflows/**'
+    - 'plugins/**'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-jsonschema
+    - name: Validate plugin properties
+      run: for x in plugins/*/plugin.json ; do jsonschema -i "$x" plugins/plugin.schema ; done
