@@ -12,14 +12,13 @@ local viewswitch = exports
 function viewswitch.startplugin()
 	local switch_hotkeys = { }
 
-	local machine = { ui_active = true }
 	local input_manager
-	local ui_manager = { menu_active = true }
+	local ui_manager = { menu_active = true, ui_active = true }
 	local render_targets
 	local menu_handler
 
 	local function frame_done()
-		if machine.ui_active and (not ui_manager.menu_active) then
+		if ui_manager.ui_active and (not ui_manager.menu_active) then
 			for k, hotkey in pairs(switch_hotkeys) do
 				if input_manager:seq_pressed(hotkey.sequence) then
 					render_targets[hotkey.target].view_index = hotkey.view
@@ -32,7 +31,7 @@ function viewswitch.startplugin()
 		local persister = require('viewswitch/viewswitch_persist')
 		switch_hotkeys = persister:load_settings()
 
-		machine = manager.machine
+		local machine = manager.machine
 		input_manager = machine.input
 		ui_manager = manager.ui
 		render_targets = machine.render.targets
@@ -44,9 +43,8 @@ function viewswitch.startplugin()
 
 		menu_handler = nil
 		render_targets = nil
-		ui_manager = { menu_active = true }
+		ui_manager = { menu_active = true, ui_active = true }
 		input_manager = nil
-		machine = { ui_active = true }
 		switch_hotkeys = { }
 	end
 
