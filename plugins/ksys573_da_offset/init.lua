@@ -150,7 +150,7 @@ function ksys573_da_offset.startplugin()
 		return menu
 	end
 
-	emu.register_start(
+	emu.register_prestart(
 			function ()
 				if not manager.machine.devices[":k573dio"] then
 					counter_offset = nil
