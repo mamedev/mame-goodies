@@ -9,6 +9,8 @@ local exports = {
 
 local viewswitch = exports
 
+local stop_subscription
+
 function viewswitch.startplugin()
 	local switch_hotkeys = { }
 
@@ -71,7 +73,7 @@ function viewswitch.startplugin()
 
 	emu.register_frame_done(frame_done)
 	emu.register_prestart(start)
-	emu.register_stop(stop)
+	stop_subscription = emu.add_machine_stop_notifier(stop)
 	emu.register_menu(menu_callback, menu_populate, 'Quick View Switch')
 end
 

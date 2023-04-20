@@ -11,6 +11,7 @@ local exports = {
 
 local plugindir
 
+local stop_subscription
 
 local function load_settings()
 	local json = require('json')
@@ -175,7 +176,7 @@ function ksys573_da_offset.startplugin()
 				emu.print_verbose(string.format('System 573 audio counter is now being offset by %s samples.', counter_offset))
 			end)
 
-	emu.register_stop(
+	stop_subscription = emu.add_machine_stop_notifier(
 			function ()
 				if passthrough_counter_high then
 					passthrough_counter_high:remove()
