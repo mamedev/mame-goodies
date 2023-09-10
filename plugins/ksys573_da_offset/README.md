@@ -8,7 +8,7 @@ Here is an example **settings.json** commented to demonstrate how to add game-sp
 
 A default offset of 28 ms is what I personally found to be most useful when running MAME on Windows, with the PortAudio sound output module using the WASAPI back-end for lowest audio latency.  I suggest you experiment with the default offset to figure out what works best for your setup.
 
-```json
+```jsonc
 {
     "default": "28ms", // Specify a default offset for all System 573 digital audio games unless overridden
                        // Setting this to 0 is the equivalent of disabling the default override
