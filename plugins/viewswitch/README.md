@@ -1,6 +1,6 @@
 # Quick view switch plugin
 
-This plugin allows you to configure hotkeys to switch views.
+This plugin allows you to configure hotkeys to switch directly to views or to cycle through available views.
 
 ## License
 

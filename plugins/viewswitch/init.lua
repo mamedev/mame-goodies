@@ -2,7 +2,7 @@
 -- copyright-holders:Vas Crabb
 local exports = {
 	name = 'viewswitch',
-	version = '0.0.1',
+	version = '0.0.2',
 	description = 'Quick view switch plugin',
 	license = 'BSD-3-Clause',
 	author = { name = 'Vas Crabb' } }
@@ -13,6 +13,7 @@ local stop_subscription
 
 function viewswitch.startplugin()
 	local switch_hotkeys = { }
+	local cycle_hotkeys = { }
 
 	local input_manager
 	local ui_manager = { menu_active = true, ui_active = true }
@@ -26,12 +27,25 @@ function viewswitch.startplugin()
 					render_targets[hotkey.target].view_index = hotkey.view
 				end
 			end
+			for k, hotkey in pairs(cycle_hotkeys) do
+				if input_manager:seq_pressed(hotkey.sequence) then
+					if not hotkey.pressed then
+						local target = render_targets[hotkey.target]
+						local index = target.view_index + hotkey.increment
+						local count = #target.view_names
+						target.view_index = (index < 1) and count or (index > count) and 1 or index
+						hotkey.pressed = true
+					end
+				else
+					hotkey.pressed = false
+				end
+			end
 		end
 	end
 
 	local function start()
 		local persister = require('viewswitch/viewswitch_persist')
-		switch_hotkeys = persister:load_settings()
+		switch_hotkeys, cycle_hotkeys = persister:load_settings()
 
 		local machine = manager.machine
 		input_manager = machine.input
@@ -41,13 +55,14 @@ function viewswitch.startplugin()
 
 	local function stop()
 		local persister = require('viewswitch/viewswitch_persist')
-		persister:save_settings(switch_hotkeys)
+		persister:save_settings(switch_hotkeys, cycle_hotkeys)
 
 		menu_handler = nil
 		render_targets = nil
 		ui_manager = { menu_active = true, ui_active = true }
 		input_manager = nil
 		switch_hotkeys = { }
+		cycle_hotkeys = { }
 	end
 
 	local function menu_callback(index, event)
@@ -61,7 +76,7 @@ function viewswitch.startplugin()
 				emu.print_error(string.format('Error loading quick view switch menu: %s', msg))
 			end
 			if menu_handler then
-				menu_handler:init(switch_hotkeys)
+				menu_handler:init(switch_hotkeys, cycle_hotkeys)
 			end
 		end
 		if menu_handler then

@@ -1,10 +1,10 @@
 # Konami System 573 digital audio offset plugin
 
-This plugin works by intercepting audio timer register reads in Konami System 573 digital hardware games and may not work perfectly in every game depending on how it uses the timer register.
+This plugin works by intercepting audio timer register reads in Konami System 573 digital hardware games.  It may not work perfectly in every game, depending on how it uses the timer register.
 
 ## Configuration
 
-Here is an example **settings.json** commented to demonstrate how to add game-specific offsets and a default offset to be used for all games on System 573 digital hardware without a specific offset specified.
+Here is an example **settings.json** commented to demonstrate how to add game-specific offsets, as well as a default offset to be used for all games on System 573 digital hardware without a specific offset specified.
 
 A default offset of 28 ms is what I personally found to be most useful when running MAME on Windows, with the PortAudio sound output module using the WASAPI back-end for lowest audio latency.  I suggest you experiment with the default offset to figure out what works best for your setup.
 
@@ -15,7 +15,7 @@ A default offset of 28 ms is what I personally found to be most useful when run
                        // Can be specified as a number of samples (e.g. 1234) or a delay in milliseconds (e.g. 1234ms)
     "overrides": {
         "ddrmax": 1234,  // Offset for the game "ddrmax" specified as a number of samples
-        "ddr5m": "50ms", // Offset for the gaem "ddr5m" specified as a delay in milliseconds (automatically converted to a number of samples)
+        "ddr5m": "50ms", // Offset for the game "ddr5m" specified as a delay in milliseconds (automatically converted to a number of samples)
     }
 }
 ```
