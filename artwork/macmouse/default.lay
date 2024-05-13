@@ -1,0 +1,262 @@
+<?xml version="1.0"?>
+<!--
+license:CC0-1.0
+authors:Vas Crabb
+-->
+<mamelayout version="2">
+	<view name="Mouse Integration" showpointers="no">
+		<screen id="screen" index="0">
+			<bounds left="0" top="0" right="~scr0nativexaspect~" bottom="~scr0nativeyaspect~" />
+		</screen>
+	</view>
+
+	<script><![CDATA[
+		file:set_resolve_tags_callback(
+			function ()
+				-- addresses of low memory globals
+				local lm_MTemp      = 0x0828
+				local lm_RawMouse   = 0x082c
+				local lm_Mouse      = 0x0830
+				local lm_CrsrNew    = 0x08ce
+				local lm_CrsrCouple = 0x08cf
+
+				-- for mapping coordinates
+				local view = file.views['Mouse Integration']
+				local screenitem = view.items['screen']
+				local l, r, t, b
+				local xscale, yscale
+				local desksize = 0
+				local scrwidth
+				local scrheight
+
+				-- figure out if this is a pre-ADB Mac
+				local preadb = false
+				for tag, dev in pairs(emu.device_enumerator(file.device)) do
+					if dev.shortname == 'mackbd_port' then
+						preadb = true
+						break
+					end
+				end
+
+				-- get screen device
+				local screendev
+				for tag, dev in pairs(emu.screen_enumerator(file.device)) do
+					if not screendev then
+						screendev = dev
+					else
+						emu.print_warning('Mouse Integration only supports a single screen')
+						return
+					end
+				end
+
+				-- get main address space - assume the main CPU tag is "maincpu"
+				local memspace
+				local cpudev = file.device:subdevice('maincpu')
+				if cpudev then
+					memspace = cpudev.spaces['program']
+				end
+				if not memspace then
+					emu.print_warning('Could not find memory space for Mouse Integration')
+					return
+				end
+				local readbyte = memspace.read_u8
+				local readlong = memspace.read_u32
+				local writebyte = memspace.write_u8
+				local writelong = memspace.write_u32
+
+				-- set up mouse control functions
+				local press_button
+				local release_button
+				local set_mouse_position
+				if preadb then
+					-- pre-ADB Macs have the mouse connected directly to the system
+					local btnfield
+					local btnport = file.device:ioport('MOUSE0')
+					if btnport then
+						btnfield = btnport:field(0x01)
+					end
+					if not btnfield then
+						emu.print_warning('Could not find mouse button I/O port field for Mouse Integration')
+						return
+					end
+					local set_input_value = btnfield.set_value
+					local clear_input_value = btnfield.clear_value
+					press_button = function () set_input_value(btnfield, 1) end
+					release_button = function () clear_input_value(btnfield) end
+
+					-- TODO: better way to guess when mouse is ready than delay?
+					local mouseready = false
+					set_mouse_position = function (x, y)
+						if not mouseready then
+							if machine.time.seconds >= 20 then
+								mouseready = true
+							else
+								return false
+							end
+						end
+						local pos = (y << 16) | x
+						if readlong(memspace, lm_MTemp) == pos then
+							return false
+						end
+						writelong(memspace, lm_MTemp, pos)
+						writelong(memspace, lm_RawMouse, pos)
+						writebyte(memspace, lm_CrsrNew, readbyte(memspace, lm_CrsrCouple))
+						return true
+					end
+				else
+					-- find a mouse-like device
+					local portman = machine.ioport
+					local fieldtypes = portman.types
+					local mousex = portman:token_to_input_type('P1_MOUSE_X')
+					local button1 = portman:token_to_input_type('P1_BUTTON1')
+					local mousexfield
+					local buttons = { }
+					local btnfield
+					for t, port in pairs(portman.ports) do
+						for n, field in pairs(port.fields) do
+							if field.type == button1 then
+								-- this is a "button 1" input
+								if mousexfield then
+									-- already found a mouse axis - see if it corresponds to this button
+									if (field.device.tag == mousexfield.device.tag) and (field.player == mousexfield.player) then
+										btnfield = field
+									end
+								else
+									-- keep candidate button inputs until mouse axis is found
+									if not buttons[field.device.tag] then
+										buttons[field.device.tag] = { }
+									end
+									buttons[field.device.tag][field.player] = field
+								end
+							elseif (not mousexfield) and (field.type == mousex) then
+								-- found a mouse axis - see if it's a child of our device
+								local ourdev = file.device.tag
+								local fielddev = field.device.tag
+								local hasourprefix = fielddev:sub(1, #ourdev) == ourdev
+								local prefixclean = (fielddev:sub(#ourdev + 1, 1) == ':') or (ourdev:sub(-1) == ':')
+								if (fielddev == ourdev) or (hasourprefix and prefixclean) then
+									-- see if we already have the corresponding button
+									mousexfield = field
+									local p = buttons[fielddev]
+									if p then
+										btnfield = p[field.player]
+									end
+									buttons = nil
+								end
+							end
+						end
+						if btnfield then
+							break
+						end
+					end
+					if not btnfield then
+						emu.print_warning('Could not find mouse button I/O port field for Mouse Integration')
+						return
+					end
+					local set_input_value = btnfield.set_value
+					local clear_input_value = btnfield.clear_value
+					press_button = function () set_input_value(btnfield, 1) end
+					release_button = function () clear_input_value(btnfield) end
+
+					-- TODO: better way to guess when mouse is ready than delay?
+					local mouseready = false
+					set_mouse_position = function (x, y)
+						if not mouseready then
+							if machine.time.seconds >= 20 then
+								mouseready = true
+							else
+								return false
+							end
+						end
+						local pos = (y << 16) | x
+						if readlong(memspace, lm_MTemp) == pos then
+							return false
+						end
+						writelong(memspace, lm_MTemp, pos)
+						writelong(memspace, lm_RawMouse, pos)
+						writelong(memspace, lm_Mouse, pos)
+						writebyte(memspace, lm_CrsrNew, 0xff)
+						return true
+					end
+				end
+
+				-- pointer state
+				local ptrid
+				local pressed = 0
+
+				-- layout geometry recomputed or screen resolution changed
+				local function recomputed()
+					local bounds = screenitem.bounds
+					l = bounds.x0
+					r = bounds.x1
+					t = bounds.y0
+					b = bounds.y1
+					scrwidth = (desksize >> 0) & 0x0000ffff
+					scrheight = (desksize >> 16) & 0x0000ffff
+					xscale = scrwidth / bounds.width
+					yscale = scrheight / bounds.height
+				end
+
+				-- abandon pointer input
+				local function forget_pointer()
+					ptrid = nil
+					pressed = 0
+					release_button()
+				end
+
+				-- pointer moved or button state changed
+				local function pointer_updated(type, id, dev, x, y, btn, dn, up, cnt)
+					-- decide whether to track this pointer
+					if (ptrid == id) or (not ptrid) or ((pressed == 0) and (dn ~= 0)) then
+						ptrid = id
+						pressed = btn
+
+						-- check screen resolution (desktop size)
+						local size = readlong(memspace, 0x0838)
+						if desksize ~= size then
+							desksize = size
+							recomputed()
+						end
+
+						-- convert position to destktop coordinates and update
+						local xmapped = (0.001 + ((x - l) * xscale)) // 1
+						local ymapped = (0.001 + ((y - t) * yscale)) // 1
+						if xmapped < 0 then
+							xmapped = 0
+						elseif xmapped > (scrwidth - 1) then
+							xmapped = scrwidth - 1
+						end
+						if ymapped < 0 then
+							ymapped = 0
+						elseif ymapped > (scrheight - 1) then
+							ymapped = scrheight - 1
+						end
+						set_mouse_position(xmapped, ymapped)
+
+						-- FIXME: need to delay one tick between updating mouse position and changing button state
+
+						-- update button state
+						if (dn & 0x01) == 0x01 then
+							press_button()
+						elseif (up & 0x01) == 0x01 then
+							release_button()
+						end
+					end
+				end
+
+				-- pointer left window or otherwise lost
+				local function pointer_lost(type, id, dev, x, y, up, cnt)
+					if ptrid == id then
+						forget_pointer()
+					end
+				end
+
+				-- attach callback handlers to view
+				view:set_recomputed_callback(recomputed)
+				view:set_pointer_updated_callback(pointer_updated)
+				view:set_pointer_left_callback(pointer_lost)
+				view:set_pointer_aborted_callback(pointer_lost)
+				view:set_forget_pointers_callback(forget_pointer)
+			end)
+	]]></script>
+</mamelayout>
