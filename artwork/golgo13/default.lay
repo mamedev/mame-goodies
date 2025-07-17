@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<mamelayout version="2">
+    <element name="warning" defstate="1">
+	<text state="1" string="This view requires the layout plugin" />
+    </element>
+    <view name="Touchscreen Lightgun" showpointers="no">
+	<screen id="screen" index="0">
+	    <bounds left="0" top="0" right="~scr0nativexaspect~" bottom="~scr0nativeyaspect~" />
+	</screen>
+	<element id="warning" ref="warning">
+	    <bounds x="0.2" y="2.7" width="3.6" height="0.1" />
+	</element>
+    </view>
+    <script>
+	<![CDATA[
+	    file:set_resolve_tags_callback(
+		function ()
+		    -- hide the warning, since if we got here the script is running
+		    file.views["Touchscreen Lightgun"].items["warning"]:set_state(0)
+
+		    local gun_x = file.device:ioport("GUN0").fields["Lightgun X"]
+		    local gun_y = file.device:ioport("GUN1").fields["Lightgun Y"]
+		    local trigger = file.device:ioport("JVS_PLAYER1").fields["Trigger"]
+
+		    local max_x = gun_x.maxvalue
+		    local max_y = gun_y.maxvalue
+
+		    file.views["Touchscreen Lightgun"]:set_pointer_updated_callback(
+			function (type, id, dev, x, y, btn, dn, up, cnt)
+			    if type == "touch" or type == "pen" then
+				local out_x = max_x * x
+				if gun_x.analog_reverse then
+				    out_x = max_x - out_x
+				end
+				gun_x:set_value(out_x)
+
+				local out_y = max_y * y
+				if gun_y.analog_reverse then
+				    out_y = max_y - out_y
+				end
+				gun_y:set_value(out_y)
+
+				if btn == 1 and dn == 1 then
+				    trigger:set_value(1)
+				elseif up == 1 then
+				    trigger:set_value(0)
+				end
+			    end
+			end
+		    )
+		end
+	    )
+	]]>
+    </script>
+</mamelayout>
