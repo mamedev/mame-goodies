@@ -1,0 +1,10 @@
+{
+	"plugin": {
+		"name": "layout_rotate",
+		"description": "Rotate layout with configurable key binding",
+		"version": "2.0.0",
+		"author": "RomRammer",
+		"type": "plugin",
+		"start": "false"
+	}
+}
